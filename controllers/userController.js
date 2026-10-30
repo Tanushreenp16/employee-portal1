@@ -2,13 +2,19 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { User, Employee } = require("../models");
 
+const JWT_SECRET = process.env.JWT_SECRET || "employee-portal-local-secret";
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 /* ================= REGISTER ================= */
 exports.register = async (req, res) => {
-  console.log("✅ Register function called - NEW VERSION");
-  console.log("Request body:", req.body);
-  
+  console.log("✅ Register function called");
+
   try {
-    const { name, email, password, role } = req.body;
+    const { name, password, role } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     // Validate input
     if (!name || !email || !password) {
@@ -50,10 +56,10 @@ exports.register = async (req, res) => {
 /* ================= LOGIN ================= */
 exports.login = async (req, res) => {
   console.log("✅ Login function called");
-  console.log("Request body:", req.body);
-  
+
   try {
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const { password } = req.body;
 
     const user = await User.findOne({ where: { email } });
     console.log("User found:", user ? `Yes - ${user.email}` : "No");
@@ -61,15 +67,22 @@ exports.login = async (req, res) => {
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
-    const match = await bcrypt.compare(password, user.password);
+    const storedPassword = user.password || "";
+    if (!storedPassword.startsWith("$2") || storedPassword.length < 60) {
+      return res.status(400).json({
+        message: "This account has no usable password. Reset the password, then log in."
+      });
+    }
+
+    const match = await bcrypt.compare(password, storedPassword);
     console.log("Password match:", match);
 
     if (!match)
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid password" });
 
     const token = jwt.sign(
       { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
+      JWT_SECRET,
       { expiresIn: "1d" }
     );
 
@@ -87,7 +100,8 @@ exports.login = async (req, res) => {
 /* ================= FORGOT PASSWORD ================= */
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const { newPassword } = req.body;
 
     if (!email || !newPassword) {
       return res.status(400).json({ message: "Email and new password required" });

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const { sequelize } = require("./models");
@@ -19,6 +20,9 @@ app.use("/employees", require("./routes/employeeRoutes"));
 app.use("/documents", require("./routes/documentRoute"));
 app.use("/tasks", require("./routes/taskRoutes"));
 
+// Pages in frontend/. Open http://localhost:4000
+app.use(express.static(path.join(__dirname, "frontend")));
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error("Server Error:", err);
@@ -34,7 +38,7 @@ process.on('unhandledRejection', (err) => {
   console.error('Unhandled Promise Rejection:', err);
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4000;
 
 // Start server ONLY after DB connects
 sequelize.authenticate()
@@ -43,6 +47,9 @@ sequelize.authenticate()
 
     return sequelize.sync();
   })
+  .then(() => sequelize.query(
+    "ALTER TABLE users MODIFY password VARCHAR(255) NOT NULL"
+  ))
   .then(() => {
     console.log("✅ ORM models synced");
 

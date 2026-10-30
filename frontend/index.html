@@ -57,13 +57,12 @@
 
   <!-- EXTRA LINKS -->
   <div class="login-links">
-    <a href="#" onclick="openForgot()">Forgot Password?</a>
+    <a href="#" onclick="openForgot()">Reset password</a>
     <div class="divider"></div>
 
     <span>Don’t have an account?</span>
     <a href="register.html"><strong>Create an Account</strong></a>
   </div>
-  <!-- FORGOT PASSWORD MODAL -->
 <div id="forgotBox" style="display:none;margin-top:15px">
 
   <div class="divider"></div>
@@ -73,16 +72,12 @@
     <input type="email" id="fpEmail" placeholder="Enter registered email">
   </div>
 
-  <button class="btn" onclick="sendOTP()">Send OTP</button>
-
-  <div id="otpSection" style="display:none;margin-top:10px">
-    <div class="input-group">
-      <label>Enter OTP</label>
-      <input type="text" id="otp" placeholder="6-digit OTP">
-    </div>
-
-    <button class="btn" onclick="verifyOTP()">Verify OTP</button>
+  <div class="input-group">
+    <label>New password</label>
+    <input type="password" id="fpPassword" placeholder="Choose a new password">
   </div>
+
+  <button class="btn" type="button" onclick="resetPassword()">Save new password</button>
 </div>
 
 </div>
@@ -127,44 +122,25 @@ function openForgot() {
   document.getElementById("forgotBox").style.display = "block";
 }
 
-function sendOTP() {
-  const email = document.getElementById("fpEmail").value;
-  if (!email) return alert("Enter email");
+function resetPassword() {
+  const email = document.getElementById("fpEmail").value.trim();
+  const newPassword = document.getElementById("fpPassword").value;
+  if (!email || !newPassword) return alert("Enter the email and a new password");
 
-  fetch("http://localhost:4000/auth/send-otp", {
+  fetch("http://localhost:4000/auth/forgot-password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email })
+    body: JSON.stringify({ email, newPassword })
   })
   .then(res => res.json())
   .then(data => {
-    alert(data.message || "OTP sent");
-    document.getElementById("otpSection").style.display = "block";
-  })
-  .catch(() => alert("Failed to send OTP"));
-}
-
-function verifyOTP() {
-  const email = document.getElementById("fpEmail").value;
-  const otp = document.getElementById("otp").value;
-
-  if (!otp) return alert("Enter OTP");
-
-  fetch("http://localhost:4000/auth/verify-otp", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, otp })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      alert("OTP verified. Redirecting...");
-      window.location.href = "reset-password.html";
-    } else {
-      alert(data.message || "Invalid OTP");
+    alert(data.message || "Password updated");
+    if (data.message === "Password updated successfully") {
+      document.getElementById("email").value = email;
+      document.getElementById("password").value = newPassword;
     }
   })
-  .catch(() => alert("OTP verification failed"));
+  .catch(() => alert("Could not reset the password"));
 }
 
 
