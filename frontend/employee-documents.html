@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Documents</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.content {
+  margin-left: 290px;
+  padding: 30px;
+}
+
+h1 {
+  color: #1e293b;
+  margin-bottom: 30px;
+}
+
+.upload-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  padding: 25px;
+  margin-bottom: 30px;
+  max-width: 500px;
+}
+
+.upload-card h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #1e293b;
+}
+
+.upload-card input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px dashed #cbd5e1;
+  margin-bottom: 15px;
+  cursor: pointer;
+}
+
+.upload-card button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #0ea5e9;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-card button:hover {
+  background: #0284c7;
+}
+
+table {
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  border-collapse: collapse;
+  overflow: hidden;
+}
+
+th {
+  background: #0ea5e9;
+  color: #fff;
+  padding: 15px;
+  text-align: left;
+  font-weight: 600;
+}
+
+td {
+  padding: 15px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.download, .delete {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  margin-right: 8px;
+  transition: all 0.2s;
+}
+
+.download {
+  background: #6366f1;
+  color: #fff;
+}
+
+.download:hover {
+  background: #4f46e5;
+}
+
+.delete {
+  background: #ef4444;
+  color: #fff;
+}
+
+.delete:hover {
+  background: #dc2626;
+}
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>EMPLOYEE</h2>
+  <a href="employee-dashboard.html">Dashboard</a>
+  <a href="employee-profile.html">Profile</a>
+  <a href="employee-documents.html" class="active">Documents</a>
+  <a href="#" class="logout" onclick="logout()">Logout</a>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+<h1>My Documents</h1>
+
+<!-- UPLOAD -->
+<div class="upload-card">
+  <h3>📤 Upload Document</h3>
+  <input type="file" id="file">
+  <button onclick="upload()">Upload Document</button>
+</div>
+
+<!-- TABLE -->
+<table>
+<thead>
+<tr>
+  <th>ID</th>
+  <th>Document Name</th>
+  <th>Actions</th>
+</tr>
+</thead>
+<tbody id="docTable">
+  <tr><td colspan="3" style="text-align: center;">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+
+<script>
+/* ================= AUTH ================= */
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+
+if (!token) {
+  window.location.href = "index.html";
+}
+
+// 🔐 Only Employee allowed
+if (role !== "Employee") {
+  window.location.href = "dashboard.html";
+}
+
+const BASE = "http://localhost:4000/documents";
+
+/* ================= UPLOAD ================= */
+function upload() {
+  const file = document.getElementById("file").files[0];
+  if (!file) return alert("Select a file");
+
+  const fd = new FormData();
+  fd.append("document", file);
+  // No need to send employee_id - backend will determine it from the token
+
+  fetch(BASE + "/upload", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + token
+    },
+    body: fd
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message || "Uploaded");
+    document.getElementById("file").value = "";
+    loadDocs();
+  })
+  .catch(err => {
+    console.error(err);
+    alert("Upload failed");
+  });
+}
+
+/* ================= LOAD DOCUMENTS ================= */
+function loadDocs() {
+  fetch(BASE + "/my", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    const table = document.getElementById("docTable");
+    table.innerHTML = "";
+
+    if (!data.length) {
+      table.innerHTML = "<tr><td colspan='3'>No documents</td></tr>";
+      return;
+    }
+
+    data.forEach(d => {
+      const file = d.file_path.split(/[/\\]/).pop();
+      table.innerHTML += `
+        <tr>
+          <td>${d.id}</td>
+          <td>${file}</td>
+          <td>
+            <button class="download" onclick="download(${d.id})">Download</button>
+            <button class="delete" onclick="removeDoc(${d.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  })
+  .catch(() => {
+    alert("Session expired");
+    logout();
+  });
+}
+
+/* ================= DOWNLOAD ================= */
+function download(id) {
+  fetch(BASE + "/download/" + id, {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  })
+  .then(res => res.blob())
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  })
+  .catch(() => alert("Download failed"));
+}
+
+/* ================= DELETE ================= */
+function removeDoc(id) {
+  if (!confirm("Delete this document?")) return;
+
+  fetch(BASE + "/delete/" + id, {
+    method: "DELETE",
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  }).then(() => loadDocs());
+}
+
+/* ================= LOGOUT ================= */
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+
+loadDocs();
+</script>
+</body>
+</html>

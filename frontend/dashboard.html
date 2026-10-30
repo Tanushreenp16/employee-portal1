@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard - Employee Portal</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+ <footer></footer>
+  <div class="sidebar">
+    <h2>EMPLOYEE PORTAL</h2>
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="employees.html">Employees</a>
+    <a href="documents.html">Documents</a>
+    <a href="tasks-admin.html">Tasks</a>
+    <a href="profile.html">Profile</a>
+    <a href="index.html" class="logout">Logout</a>
+  </div>
+
+  <div class="main">
+    <h1>Dashboard Overview</h1>
+
+    <div class="cards">
+  <div class="card" style="cursor: pointer;" onclick="window.location.href='employees.html'">
+    <h3>Total Employees</h3>
+    <p id="totalEmployees">0</p>
+  </div>
+
+  <div class="card" style="cursor: pointer;" onclick="window.location.href='employees.html?status=Active'">
+    <h3>Active Employees</h3>
+    <p id="activeEmployees">0</p>
+  </div>
+
+  <div class="card" style="cursor: pointer;" onclick="window.location.href='employees.html?status=Inactive'">
+    <h3>Inactive Employees</h3>
+    <p id="inactiveEmployees">0</p>
+  </div>
+</div>
+
+<!-- Charts + Recent Employees -->
+<div class="dashboard-grid">
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <h3>Employee Status Overview</h3>
+    <canvas id="employeeChart" style="max-width:220px; max-height:220px; margin:auto;"></canvas>
+
+  </div>
+<!-- Department Wise Chart -->
+<div class="chart-card">
+  <h3>Employees by Department</h3>
+  <canvas id="deptChart"></canvas>
+</div>
+
+  <!-- Recent Employees -->
+  <div class="recent-card">
+    <h3>Recently Added Employees</h3>
+    <table class="recent-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Department</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="recentEmployees"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Chart JS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const API = "http://localhost:4000/employees/list";
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+if (!token) {
+  window.location.href = "index.html";
+}
+if (role === "Employee") {
+  window.location.href = "employee-dashboard.html";
+}
+fetch(API, {
+  headers: {
+    Authorization: "Bearer " + token
+  }
+})
+.then(res => {
+  if (!res.ok) throw new Error("Unauthorized");
+  return res.json();
+})
+.then(data => {
+  if (!Array.isArray(data)) return;
+
+  const total = data.length;
+  const active = data.filter(e => e.status === "Active").length;
+  const inactive = data.filter(e => e.status === "Inactive").length;
+
+  animateCount("totalEmployees", total);
+  animateCount("activeEmployees", active);
+  animateCount("inactiveEmployees", inactive);
+
+  loadChart(active, inactive);
+  loadDepartmentChart(data);
+  loadRecentEmployees(data);
+})
+.catch(err => {
+  console.error(err);
+  alert("Session expired. Please login again.");
+  localStorage.removeItem("token");
+  window.location.href = "index.html";
+});
+
+/* Animated Counter */
+function animateCount(id, value) {
+  let count = 0;
+  const el = document.getElementById(id);
+  const interval = setInterval(() => {
+    count++;
+    el.innerText = count;
+    if (count === value) clearInterval(interval);
+  }, 20);
+}
+
+/* Status Chart */
+function loadChart(active, inactive) {
+  new Chart(document.getElementById("employeeChart"), {
+    type: "pie",
+    data: {
+      labels: ["Active", "Inactive"],
+      datasets: [{
+        data: [active, inactive],
+        backgroundColor: ["#22c55e", "#ef4444"]
+      }]
+    }
+  });
+}
+
+/* Recent Employees */
+function loadRecentEmployees(data) {
+  const tbody = document.getElementById("recentEmployees");
+  tbody.innerHTML = "";
+
+  data.slice(-5).reverse().forEach(e => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${e.name}</td>
+        <td>${e.department}</td>
+        <td class="${e.status === "Active" ? "status-active" : "status-inactive"}">
+          ${e.status}
+        </td>
+      </tr>`;
+  });
+}
+
+/* Department Chart */
+function loadDepartmentChart(data) {
+  const deptCount = {};
+
+  data.forEach(emp => {
+    const dept = emp.department?.trim() || "Others";
+    deptCount[dept] = (deptCount[dept] || 0) + 1;
+  });
+
+  new Chart(document.getElementById("deptChart"), {
+    type: "bar",
+    data: {
+      labels: Object.keys(deptCount),
+      datasets: [{
+        label: "Employees per Department",
+        data: Object.values(deptCount),
+        backgroundColor: "#2563eb"
+      }]
+    }
+  });
+}
+</script>
+
+
+
+</body>
+</html>

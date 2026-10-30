@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Create Account</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="center">
+
+<div class="login-box">
+  <h2>Create Account</h2>
+
+  <form id="registerForm">
+    <div class="input-group">
+      <label>Name</label>
+      <input type="text" id="name" required>
+    </div>
+
+    <div class="input-group">
+      <label>Email</label>
+      <input type="email" id="email" required>
+    </div>
+
+    <div class="input-group">
+      <label>Password</label>
+      <input type="password" id="password" required>
+    </div>
+
+    <div class="input-group">
+      <label>Role</label>
+      <select id="role">
+  <option value="Employee">Employee</option>
+  <option value="HR">HR</option>
+  <option value="Admin">Admin</option>
+</select>
+
+    </div>
+
+    <button class="btn">Register</button>
+  </form>
+
+  <p style="margin-top:15px;text-align:center">
+    Already have an account?
+    <a href="index.html">Login</a>
+  </p>
+</div>
+
+<script>
+document.getElementById("registerForm").addEventListener("submit", async e => {
+  e.preventDefault();
+
+  const name = document.getElementById("name").value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const role = document.getElementById("role").value;
+
+  try {
+    const res = await fetch("http://localhost:4000/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name,
+        email: email,
+        password: password,
+        role: role
+      })
+    });
+
+    const data = await res.json();
+    console.log("Registration response:", data);
+
+    alert(data.message);
+
+    if (res.ok) location.href = "index.html";
+  } catch (err) {
+    console.error("Registration error:", err);
+    alert("Server error. Please try again.");
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Documents - Employee Portal</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.content {
+  margin-left: 130px;
+  padding: 30px;
+}
+
+h1 {
+  color: #1e293b;
+  margin-bottom: 30px;
+}
+
+table {
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  border-collapse: collapse;
+  overflow: hidden;
+}
+
+th {
+  background: #0ea5e9;
+  color: #fff;
+  padding: 15px;
+  text-align: left;
+  font-weight: 600;
+}
+
+td {
+  padding: 15px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.download, .delete {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  margin-right: 8px;
+  transition: all 0.2s;
+}
+
+.download {
+  background: #6366f1;
+  color: #fff;
+}
+
+.download:hover {
+  background: #4f46e5;
+}
+
+.delete {
+  background: #ef4444;
+  color: #fff;
+}
+
+.delete:hover {
+  background: #dc2626;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h2>EMPLOYEE PORTAL</h2>
+  <a href="dashboard.html">Dashboard</a>
+  <a href="employees.html">Employees</a>
+  <a href="documents.html" class="active">Documents</a>
+  <a href="profile.html">Profile</a>
+  <a href="#" class="logout" onclick="logout()">Logout</a>
+</div>
+
+<div class="content">
+<div class="content">
+<h1>All Documents</h1>
+
+<!-- Documents Table -->
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Employee</th>
+<th>Document Name</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="docTable">
+  <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+
+<script>
+/* ================= AUTH ================= */
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+
+if (!token) {
+  window.location.href = "index.html";
+}
+
+// 🔐 Only Admin/HR allowed
+if (role === "Employee") {
+  window.location.href = "employee-dashboard.html";
+}
+
+const BASE = "http://localhost:4000/documents";
+
+/* ================= LOAD ALL DOCUMENTS ================= */
+function loadDocs() {
+  fetch(BASE + "/all", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  })
+  .then(res => res.json())
+  .then(docs => {
+    const t = document.getElementById("docTable");
+    t.innerHTML = "";
+
+    if (!docs.length) {
+      t.innerHTML = "<tr><td colspan='4'>No documents</td></tr>";
+      return;
+    }
+
+    docs.forEach(d => {
+      const employeeName = d.Employee?.name || 'N/A';
+      t.innerHTML += `
+        <tr>
+          <td>${d.id}</td>
+          <td>${employeeName}</td>
+          <td>${d.document_name}</td>
+          <td>
+            <button class="download" onclick="download(${d.id})">Download</button>
+            <button class="delete" onclick="removeDoc(${d.id})">Delete</button>
+          </td>
+        </tr>`;
+    });
+  })
+  .catch(() => {
+    alert("Session expired");
+    logout();
+  });
+}
+
+/* ================= DOWNLOAD ================= */
+function download(id) {
+  fetch(`${BASE}/download/${id}`, {
+    headers: { Authorization: "Bearer " + token }
+  })
+  .then(res => res.blob())
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  });
+}
+
+/* ================= DELETE ================= */
+function removeDoc(id) {
+  if (!confirm("Delete this document?")) return;
+
+  fetch(`${BASE}/delete/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token }
+  })
+  .then(() => loadDocs());
+}
+
+/* ================= LOGOUT ================= */
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+
+loadDocs();
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Profile - Employee Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h2>EMPLOYEE PORTAL</h2>
+  <a href="dashboard.html">Dashboard</a>
+  <a href="employees.html">Employees</a>
+  <a href="documents.html">Documents</a>
+  <a href="profile.html" class="active">Profile</a>
+  <a href="#" class="logout" onclick="logout()">Logout</a>
+</div>
+
+<!-- Profile Card -->
+<div class="profile-card">
+
+  <div class="profile-pic-section">
+    <img id="profilePic" src="images/default-avatar.png" alt="Profile Picture">
+    <label class="upload-btn">
+      Change Photo
+      <input type="file" hidden onchange="previewImage(event)">
+    </label>
+  </div>
+
+  <div class="profile-header">
+    <h2>My Profile</h2>
+    <button onclick="enableEdit()">Edit Profile</button>
+  </div>
+
+  <div class="profile-grid">
+    <input id="name" placeholder="Name" disabled>
+    <input id="department" placeholder="Department" disabled>
+    <input id="designation" placeholder="Designation" disabled>
+    <input id="email" placeholder="Email" disabled>
+    <input id="phone" placeholder="Phone" disabled>
+    <input id="location" placeholder="Location" disabled>
+
+    <select id="status" disabled>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+  </div>
+
+  <div class="profile-actions">
+    <button onclick="updateProfile()">Save Changes</button>
+  </div>
+</div>
+
+<hr>
+
+<!-- Password Section (UI only for now) -->
+<div class="password-card">
+  <h3>Change Password</h3>
+  <input type="password" placeholder="Current Password">
+  <input type="password" placeholder="New Password">
+  <input type="password" placeholder="Confirm New Password">
+  <button class="danger">Update Password</button>
+</div>
+
+<script>
+const API = "http://localhost:4000/employees/profile";
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+
+/* Redirect if not logged in */
+if (!token) {
+  window.location.href = "index.html";
+}
+
+/* 🔐 Only Admin / HR allowed */
+if (role === "Employee") {
+  window.location.href = "employee-dashboard.html";
+}
+
+/* Load profile on page load */
+window.onload = () => {
+  fetchProfile();
+};
+
+/* Fetch profile */
+function fetchProfile() {
+  fetch(API, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Unauthorized");
+    return res.json();
+  })
+  .then(data => {
+    document.getElementById("name").value = data.name || "";
+    document.getElementById("department").value = data.department || "";
+    document.getElementById("designation").value = data.designation || "";
+    document.getElementById("email").value = data.email || "";
+    document.getElementById("phone").value = data.phone || "";
+    document.getElementById("location").value = data.location || "";
+    document.getElementById("status").value = data.status || "Active";
+  })
+  .catch(() => {
+    alert("Session expired. Please login again.");
+    logout();
+  });
+}
+
+/* Enable edit */
+function enableEdit() {
+  document
+    .querySelectorAll(".profile-grid input, .profile-grid select")
+    .forEach(el => el.disabled = false);
+}
+
+/* Update profile */
+function updateProfile() {
+  const payload = {
+    name: name.value,
+    department: department.value,
+    designation: designation.value,
+    email: email.value,
+    phone: phone.value,
+    location: location.value,
+    status: status.value
+  };
+
+  fetch(API, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message || "Profile updated successfully");
+    fetchProfile();
+  })
+  .catch(() => alert("Failed to update profile"));
+}
+
+/* Profile image preview (frontend only) */
+const img = document.getElementById("profilePic");
+
+/* Load saved image */
+const savedPic = localStorage.getItem("profilePic");
+if (savedPic) {
+  img.src = savedPic;
+}
+
+function previewImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function () {
+    img.src = reader.result;
+    localStorage.setItem("profilePic", reader.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Logout */
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Management</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h2>EMPLOYEE PORTAL</h2>
+  <a href="dashboard.html">Dashboard</a>
+  <a href="employees.html" class="active">Employees</a>
+  <a href="documents.html">Documents</a>
+  <a href="profile.html">Profile</a>
+  <a href="#" class="logout" onclick="logout()">Logout</a>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <h1>Employee Management</h1>
+
+  <!-- Search Bar -->
+  <div class="search-bar">
+    <input id="searchName" placeholder="Name">
+    <input id="searchDept" placeholder="Department">
+    <input id="searchDesg" placeholder="Designation">
+    <input id="searchLocation" placeholder="Location">
+    <select id="searchStatus">
+      <option value="">All Status</option>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+    </select>
+    <button onclick="searchEmployees()">Search</button>
+    <button class="btn-secondary" onclick="clearSearch()">Clear</button>
+    <button class="btn-secondary" onclick="openForm()">+ Add Employee</button>
+  </div>
+
+  <!-- Employee Table -->
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th style="cursor: pointer;" onclick="sortTable('name')">
+          Name <span id="sortNameIcon">↕️</span>
+        </th>
+        <th>Department</th>
+        <th>Designation</th>
+        <th style="cursor: pointer;" onclick="sortTable('email')">
+          Email <span id="sortEmailIcon">↕️</span>
+        </th>
+        <th>Phone</th>
+        <th>Location</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="empTable"></tbody>
+  </table>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <button id="prevBtn" onclick="prevPage()">Prev</button>
+    <span id="pageInfo">Page 1</span>
+    <button id="nextBtn" onclick="nextPage()">Next</button>
+  </div>
+</div>
+
+<!-- Modal Form -->
+<div id="modalForm" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeForm()">&times;</span>
+    <h3 id="formTitle">Add Employee</h3>
+    <input type="hidden" id="empId">
+
+    <div class="grid">
+      <input id="name" placeholder="Name">
+      <input id="department" placeholder="Department">
+      <input id="designation" placeholder="Designation">
+      <input id="email" placeholder="Email">
+      <input id="phone" type="tel" placeholder="Phone" pattern="[0-9]{10}" minlength="10" maxlength="10" title="Please enter exactly 10 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)">
+      <input id="location" placeholder="Location">
+      <select id="status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </div>
+
+    <div class="form-actions">
+      <button onclick="saveEmployee()">Save</button>
+      <button class="btn-secondary" onclick="closeForm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Document Modal -->
+<div id="documentModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeDocumentModal()">&times;</span>
+    <h3 id="docModalTitle">Employee Documents</h3>
+    <input type="hidden" id="docEmployeeId">
+    
+    <!-- Upload Section -->
+    <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 8px;">
+      <h4>Upload Document</h4>
+      <input type="file" id="documentFile" style="margin-bottom: 10px;">
+      <button onclick="uploadEmployeeDocument()">Upload</button>
+    </div>
+
+    <!-- Documents List -->
+    <div id="employeeDocumentsList">
+      <h4>Documents</h4>
+      <table style="width: 100%;">
+        <thead>
+          <tr>
+            <th>Document Name</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="docsTableBody">
+          <tr><td colspan="2">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= AUTH + ROLE ================= */
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+
+if (!token) {
+  window.location.href = "index.html";
+}
+
+// 🔐 Only Admin / HR allowed
+if (role === "Employee") {
+  window.location.href = "employee-dashboard.html";
+}
+
+/* ================= CONFIG ================= */
+const API = "http://localhost:4000/employees";
+let employees = [];
+let currentPage = 1;
+const pageSize = 5;
+let sortField = null;
+let sortOrder = 'asc'; // 'asc' or 'desc'
+
+/* ================= LOAD EMPLOYEES ================= */
+function loadEmployees(url = API + "/list") {
+  fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    employees = Array.isArray(data) ? data : [];
+    currentPage = 1;
+    
+    // Check for URL parameters and apply filters
+    const urlParams = new URLSearchParams(window.location.search);
+    const statusFilter = urlParams.get('status');
+    
+    if (statusFilter) {
+      // Set the status dropdown
+      document.getElementById('searchStatus').value = statusFilter;
+      // Filter employees
+      employees = employees.filter(emp => emp.status === statusFilter);
+    }
+    
+    renderTable();
+  })
+  .catch(() => {
+    alert("Session expired. Please login again.");
+    logout();
+  });
+}
+
+/* ================= RENDER TABLE ================= */
+function renderTable() {
+  const tbody = document.getElementById("empTable");
+  tbody.innerHTML = "";
+
+  const start = (currentPage - 1) * pageSize;
+  const pageItems = employees.slice(start, start + pageSize);
+
+  if (!pageItems.length) {
+    tbody.innerHTML = "<tr><td colspan='9'>No employees found</td></tr>";
+  } else {
+    pageItems.forEach(e => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${e.id}</td>
+          <td>${e.name}</td>
+          <td>${e.department || ""}</td>
+          <td>${e.designation || ""}</td>
+          <td>${e.email || ""}</td>
+          <td>${e.phone || ""}</td>
+          <td>${e.location || ""}</td>
+          <td>
+            <select onchange="changeStatus(${e.id}, this.value)">
+              <option value="Active" ${e.status === "Active" ? "selected" : ""}>Active</option>
+              <option value="Inactive" ${e.status === "Inactive" ? "selected" : ""}>Inactive</option>
+            </select>
+          </td>
+          <td>
+            <button onclick="editEmployee(${e.id})">Edit</button>
+            <button class="btn-secondary" onclick="viewEmployeeDocuments(${e.id}, '${e.name}')">Documents</button>
+            <button class="danger" onclick="deleteEmployee(${e.id})">Delete</button>
+          </td>
+        </tr>`;
+    });
+  }
+
+  updatePagination();
+}
+
+/* ================= UPDATE PAGINATION ================= */
+function updatePagination() {
+  const totalPages = Math.ceil(employees.length / pageSize);
+  const pageInfo = document.getElementById("pageInfo");
+  const paginationDiv = document.querySelector(".pagination");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  
+  // Hide pagination if only one page or no data
+  if (totalPages <= 1) {
+    paginationDiv.style.display = "none";
+  } else {
+    paginationDiv.style.display = "flex";
+    pageInfo.innerText = `Page ${currentPage} of ${totalPages}`;
+    
+    // Show/hide Prev button
+    if (currentPage === 1) {
+      prevBtn.style.display = "none";
+    } else {
+      prevBtn.style.display = "inline-block";
+    }
+    
+    // Show/hide Next button
+    if (currentPage >= totalPages) {
+      nextBtn.style.display = "none";
+    } else {
+      nextBtn.style.display = "inline-block";
+    }
+  }
+}
+
+/* ================= PAGINATION ================= */
+function nextPage() {
+  if (currentPage * pageSize < employees.length) {
+    currentPage++;
+    renderTable();
+  }
+}
+function prevPage() {
+  if (currentPage > 1) {
+    currentPage--;
+    renderTable();
+  }
+}
+
+/* ================= SORTING ================= */
+function sortTable(field) {
+  // Toggle sort order if clicking same field
+  if (sortField === field) {
+    sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortField = field;
+    sortOrder = 'asc';
+  }
+
+  // Sort the employees array
+  employees.sort((a, b) => {
+    const aVal = (a[field] || '').toString().toLowerCase();
+    const bVal = (b[field] || '').toString().toLowerCase();
+    
+    if (sortOrder === 'asc') {
+      return aVal.localeCompare(bVal);
+    } else {
+      return bVal.localeCompare(aVal);
+    }
+  });
+
+  // Update icons
+  updateSortIcons();
+  
+  // Reset to first page and render
+  currentPage = 1;
+  renderTable();
+}
+
+function updateSortIcons() {
+  // Reset all icons
+  document.getElementById('sortNameIcon').innerHTML = '↕️';
+  document.getElementById('sortEmailIcon').innerHTML = '↕️';
+
+  // Update active field icon
+  if (sortField === 'name') {
+    document.getElementById('sortNameIcon').innerHTML = sortOrder === 'asc' ? '↑' : '↓';
+  } else if (sortField === 'email') {
+    document.getElementById('sortEmailIcon').innerHTML = sortOrder === 'asc' ? '↑' : '↓';
+  }
+}
+
+/* ================= SEARCH ================= */
+function searchEmployees() {
+  const url = `${API}/search?name=${searchName.value}&department=${searchDept.value}&designation=${searchDesg.value}&location=${searchLocation.value}&status=${searchStatus.value}`;
+
+  fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(res => res.json())
+  .then(data => {
+    employees = Array.isArray(data) ? data : [];
+    currentPage = 1;
+    renderTable();
+  });
+}
+
+function clearSearch() {
+  searchName.value = "";
+  searchDept.value = "";
+  searchDesg.value = "";
+  searchLocation.value = "";
+  searchStatus.value = "";
+  loadEmployees();
+}
+
+/* ================= MODAL ================= */
+function openForm() {
+  modalForm.style.display = "block";
+  formTitle.innerText = "Add Employee";
+  empId.value = "";
+  document.querySelectorAll(".grid input, .grid select").forEach(i => i.value = "");
+}
+function closeForm() {
+  modalForm.style.display = "none";
+}
+
+/* ================= EDIT ================= */
+function editEmployee(id) {
+  const e = employees.find(x => x.id === id);
+  openForm();
+  document.getElementById('formTitle').innerText = "Update Employee";
+  document.getElementById('empId').value = e.id;
+
+  document.getElementById('name').value = e.name || '';
+  document.getElementById('department').value = e.department || '';
+  document.getElementById('designation').value = e.designation || '';
+  document.getElementById('email').value = e.email || '';
+  document.getElementById('phone').value = e.phone || '';
+  document.getElementById('location').value = e.location || '';
+  document.getElementById('status').value = e.status || 'Active';
+}
+
+/* ================= SAVE ================= */
+function saveEmployee() {
+  const id = document.getElementById('empId').value;
+  const nameValue = document.getElementById('name').value;
+  const deptValue = document.getElementById('department').value;
+  const desgValue = document.getElementById('designation').value;
+  const emailValue = document.getElementById('email').value;
+  const phoneValue = document.getElementById('phone').value;
+  const locValue = document.getElementById('location').value;
+  const statusValue = document.getElementById('status').value;
+
+  // Validate required fields
+  if (!nameValue) {
+    alert("Name is required");
+    return;
+  }
+
+  // Validate phone number
+  if (phoneValue && !/^\d{10}$/.test(phoneValue)) {
+    alert("Phone number must be exactly 10 digits");
+    return;
+  }
+
+  fetch(id ? `${API}/update/${id}` : `${API}/add`, {
+    method: id ? "PUT" : "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      name: nameValue,
+      department: deptValue,
+      designation: desgValue,
+      email: emailValue,
+      phone: phoneValue,
+      location: locValue,
+      status: statusValue
+    })
+  })
+  .then(res => {
+    if (!res.ok) {
+      return res.json().then(data => {
+        throw new Error(data.message || 'Failed to save employee');
+      });
+    }
+    return res.json();
+  })
+  .then(() => {
+    alert("Employee saved successfully!");
+    closeForm();
+    loadEmployees();
+  })
+  .catch(err => {
+    console.error("Error saving employee:", err);
+    alert("Error: " + err.message);
+  });
+}
+
+/* ================= STATUS ================= */
+function changeStatus(id, statusVal) {
+  fetch(`${API}/update/${id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ status: statusVal })
+  }).then(() => loadEmployees());
+}
+
+/* ================= DELETE ================= */
+function deleteEmployee(id) {
+  if (!confirm("Are you sure?")) return;
+
+  fetch(`${API}/delete/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  }).then(() => loadEmployees());
+}
+
+/* ================= LOGOUT ================= */
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+
+/* ================= DOCUMENT FUNCTIONS ================= */
+function viewEmployeeDocuments(empId, empName) {
+  document.getElementById('docEmployeeId').value = empId;
+  document.getElementById('docModalTitle').innerText = `${empName} - Documents`;
+  document.getElementById('documentModal').style.display = 'block';
+  loadEmployeeDocuments(empId);
+}
+
+function closeDocumentModal() {
+  document.getElementById('documentModal').style.display = 'none';
+  document.getElementById('documentFile').value = '';
+}
+
+function loadEmployeeDocuments(empId) {
+  fetch(`http://localhost:4000/documents/employee/${empId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(res => res.json())
+  .then(docs => {
+    const tbody = document.getElementById('docsTableBody');
+    if (!docs.length) {
+      tbody.innerHTML = '<tr><td colspan="2">No documents found</td></tr>';
+    } else {
+      tbody.innerHTML = docs.map(doc => `
+        <tr>
+          <td>${doc.document_name}</td>
+          <td>
+            <button class="download" onclick="downloadDoc(${doc.id})">Download</button>
+            <button class="delete" onclick="deleteDoc(${doc.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById('docsTableBody').innerHTML = '<tr><td colspan="2">Error loading documents</td></tr>';
+  });
+}
+
+function uploadEmployeeDocument() {
+  const empId = document.getElementById('docEmployeeId').value;
+  const fileInput = document.getElementById('documentFile');
+  
+  if (!fileInput.files.length) {
+    alert('Please select a file');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('document', fileInput.files[0]);
+  formData.append('employee_id', empId);
+
+  fetch('http://localhost:4000/documents/upload', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  })
+  .then(res => res.json())
+  .then(() => {
+    alert('Document uploaded successfully!');
+    fileInput.value = '';
+    loadEmployeeDocuments(empId);
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Error uploading document');
+  });
+}
+
+function downloadDoc(id) {
+  window.open(`http://localhost:4000/documents/download/${id}`, '_blank');
+}
+
+function deleteDoc(id) {
+  if (!confirm('Delete this document?')) return;
+  
+  fetch(`http://localhost:4000/documents/delete/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(() => {
+    const empId = document.getElementById('docEmployeeId').value;
+    loadEmployeeDocuments(empId);
+  });
+}
+
+window.onclick = e => {
+  if (e.target === modalForm) closeForm();
+  if (e.target === documentModal) closeDocumentModal();
+};
+
+loadEmployees();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Profile - Employee Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h2>EMPLOYEE</h2>
+  <a href="employee-dashboard.html">Dashboard</a>
+  <a href="employee-profile.html" class="active">My Profile</a>
+  <a href="employee-documents.html">My Documents</a>
+  <a href="#" class="logout" onclick="logout()">Logout</a>
+</div>
+
+<!-- Profile Card -->
+<div class="profile-card">
+
+  <div class="profile-header">
+    <h2>My Profile</h2>
+    <button onclick="enableEdit()">Edit</button>
+  </div>
+
+  <div class="profile-pic-section">
+    <img id="profilePic" src="images/default-avatar.png" alt="Profile Picture">
+    <label class="upload-btn">
+      Change Photo
+      <input type="file" hidden onchange="previewImage(event)">
+    </label>
+  </div>
+
+  <div class="profile-grid">
+    <input id="name" placeholder="Name" disabled>
+    <input id="email" placeholder="Email" disabled>
+    <input id="department" placeholder="Department" disabled>
+    <input id="designation" placeholder="Designation" disabled>
+    <input id="phone" placeholder="Phone" disabled>
+    <input id="location" placeholder="Location" disabled>
+    <input id="status" placeholder="Status" disabled>
+    <input id="role" placeholder="Role" disabled>
+  </div>
+
+  <div class="profile-actions">
+    <button onclick="updateProfile()">Save Changes</button>
+  </div>
+
+</div>
+
+<script>
+/* ================= AUTH ================= */
+const token = localStorage.getItem("token");
+const role = localStorage.getItem("role");
+
+if (!token) {
+  window.location.href = "index.html";
+}
+
+// 🔐 Only Employee allowed
+if (role !== "Employee") {
+  window.location.href = "dashboard.html";
+}
+
+const API = "http://localhost:4000/auth/me";
+const EMP_API = "http://localhost:4000/employees/profile";
+
+/* ================= LOAD PROFILE ================= */
+window.onload = () => {
+  fetchProfile();
+};
+
+function fetchProfile() {
+  // Fetch user data
+  fetch(API, {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  })
+  .then(res => res.json())
+  .then(userData => {
+    document.getElementById("role").value = userData.role || "";
+    
+    // Fetch employee data
+    return fetch(EMP_API, {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+  })
+  .then(res => res.json())
+  .then(empData => {
+    console.log("Employee data:", empData);
+    document.getElementById("name").value = empData.name || "";
+    document.getElementById("email").value = empData.email || "";
+    document.getElementById("department").value = empData.department || "";
+    document.getElementById("designation").value = empData.designation || "";
+    document.getElementById("phone").value = empData.phone || "";
+    document.getElementById("location").value = empData.location || "";
+    document.getElementById("status").value = empData.status || "";
+  })
+  .catch(err => {
+    console.error("Error loading profile:", err);
+    alert("Error loading profile. Please try again.");
+  });
+}
+
+/* ================= EDIT ================= */
+function enableEdit() {
+  document.getElementById("name").disabled = false;
+}
+
+/* ================= UPDATE ================= */
+/* NOTE: Backend does not support updating user profile directly.
+   This is kept UI-only to avoid API mismatch. */
+function updateProfile() {
+  alert("Profile update is managed by admin.");
+  document.getElementById("name").disabled = true;
+}
+
+/* ================= PROFILE IMAGE (FRONTEND ONLY) ================= */
+const img = document.getElementById("profilePic");
+const savedPic = localStorage.getItem("profilePic");
+
+if (savedPic) {
+  img.src = savedPic;
+}
+
+function previewImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function () {
+    img.src = reader.result;
+    localStorage.setItem("profilePic", reader.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ================= LOGOUT ================= */
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

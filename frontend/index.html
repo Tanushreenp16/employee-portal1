@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Employee Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Extra login page helpers */
+    .login-links {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    .login-links a {
+      color: #2563eb;
+      text-decoration: none;
+      display: block;
+      margin-top: 8px;
+    }
+
+    .login-links a:hover {
+      text-decoration: underline;
+    }
+
+    .divider {
+      margin: 15px 0;
+      height: 1px;
+      background: #e5e7eb;
+    }
+    #forgotBox .btn {
+  margin-top: 10px;
+  background: #16a34a;
+}
+
+  </style>
+</head>
+
+<body class="center">
+
+<div class="login-box">
+  <h2>Employee Login</h2>
+
+  <form id="loginForm">
+    <div class="input-group">
+      <label>Email</label>
+      <input type="email" id="email" required>
+    </div>
+
+    <div class="input-group">
+      <label>Password</label>
+      <input type="password" id="password" required>
+    </div>
+
+    <button type="submit" class="btn">Login</button>
+  </form>
+
+  <!-- EXTRA LINKS -->
+  <div class="login-links">
+    <a href="#" onclick="openForgot()">Forgot Password?</a>
+    <div class="divider"></div>
+
+    <span>Don’t have an account?</span>
+    <a href="register.html"><strong>Create an Account</strong></a>
+  </div>
+  <!-- FORGOT PASSWORD MODAL -->
+<div id="forgotBox" style="display:none;margin-top:15px">
+
+  <div class="divider"></div>
+
+  <div class="input-group">
+    <label>Email</label>
+    <input type="email" id="fpEmail" placeholder="Enter registered email">
+  </div>
+
+  <button class="btn" onclick="sendOTP()">Send OTP</button>
+
+  <div id="otpSection" style="display:none;margin-top:10px">
+    <div class="input-group">
+      <label>Enter OTP</label>
+      <input type="text" id="otp" placeholder="6-digit OTP">
+    </div>
+
+    <button class="btn" onclick="verifyOTP()">Verify OTP</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+document.getElementById("loginForm").addEventListener("submit", function(e){
+  e.preventDefault();
+
+  // Get input values
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  fetch("http://localhost:4000/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }) // now values are sent
+  })
+  .then(res => res.json())
+  .then(data => {
+    if(data.token){
+      // 🔹 Save token and role
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("role", data.role);
+      localStorage.setItem("name", data.name);
+      
+   
+      // 🔹 Redirect based on role
+      if (data.role === "Employee") {
+  window.location.href = "employee-dashboard.html";
+} else {
+  window.location.href = "dashboard.html";
+}
+
+    } else {
+      alert(data.message);
+    }
+  })
+  .catch(() => alert("Server error. Please try again."));
+});
+
+function openForgot() {
+  document.getElementById("forgotBox").style.display = "block";
+}
+
+function sendOTP() {
+  const email = document.getElementById("fpEmail").value;
+  if (!email) return alert("Enter email");
+
+  fetch("http://localhost:4000/auth/send-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  })
+  .then(res => res.json())
+  .then(data => {
+    alert(data.message || "OTP sent");
+    document.getElementById("otpSection").style.display = "block";
+  })
+  .catch(() => alert("Failed to send OTP"));
+}
+
+function verifyOTP() {
+  const email = document.getElementById("fpEmail").value;
+  const otp = document.getElementById("otp").value;
+
+  if (!otp) return alert("Enter OTP");
+
+  fetch("http://localhost:4000/auth/verify-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert("OTP verified. Redirecting...");
+      window.location.href = "reset-password.html";
+    } else {
+      alert(data.message || "Invalid OTP");
+    }
+  })
+  .catch(() => alert("OTP verification failed"));
+}
+
+
+</script>
+
+
+</body>
+</html>
